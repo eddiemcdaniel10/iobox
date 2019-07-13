@@ -39,24 +39,29 @@ def test_prometheus_input():
   """test_prometheus_input
   """
   n=600
-  q=n/4
-  for i in range(n):
-    m = i % q
-    ev = m % 2
-    if ev == 0:
-        for j in range(i):
-            subprocess.call(["dig", "@localhost", "-p", "1053",
-                "www.google.com"], stdout=subprocess.PIPE)
-    else:
-        for j in range(q )
+  q= n // 16
 
-  time.sleep(2)
+  for i in range(n):
+    req_count = i % q
+    q_count = i // q
+    flip = (q_count % 2) == 1
+    req_count = q - req_count if flip else req_count
+
+    bump_factor = int(float(i) / n * q)
+
+    for _ in range(req_count + bump_factor):
+      subprocess.call(["dig", "@localhost", "-p", "1053", "www.google.com"], stdout=subprocess.PIPE)
+    
+    time.sleep(1)
+
   prometheus_dataset = prometheus_io.PrometheusDataset(
       "http://localhost:9090",
-      schema="delta(coredns_dns_request_count_total[1m])[10m:1m]",
-      batch=10)
-  i = 0
+      schema="delta(coredns_dns_request_count_total[5s])[600s:5s]",
+      batch=120)
+
   for k, v in prometheus_dataset:
-    print("K, V: ", k.numpy(), v.numpy())
+    joined = zip(k.numpy(), v.numpy())
+    for k1, v1 in joined:
+      print(f"{k1},{v1}")
 
 test_prometheus_input()
