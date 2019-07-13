@@ -1,0 +1,87 @@
+---
+- hosts: all
+  become: true
+  tasks:
+  - name: Install packages that allow apt to be used over HTTPS
+    apt:
+      name: "{{ packages }}"
+      state: present
+      update_cache: yes
+    vars:
+      packages:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg-agent
+      - software-properties-common
+
+  - name: Add an apt signing key for Docker
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+
+  - name: Add apt repository for stable version
+    apt_repository:
+      repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu bionic stable
+      state: present
+
+  - name: Install docker and its dependecies
+    apt: 
+      name: "{{ packages }}"
+      state: present
+      update_cache: yes
+    vars:
+      packages:
+      - docker-ce 
+      - docker-ce-cli 
+      - containerd.io
+      - python3-pip
+  
+  - name: Install tensorflow-io and stuff
+    pip:
+      name:
+      - tensorflow-io-nightly
+      - pytest
+      - docker
+
+  - name: Add vagrant user to docker group
+    user:
+      name: vagrant
+      group: docker
+  
+  - name: Add folder for prom and coredns configs
+    file:
+      state: directory
+      path: /home/vagrant/config
+      owner: vagrant
+      group: vagrant
+  
+  - name: Add coredns config
+    copy:
+      src: coredns.config
+      dest: /home/vagrant/config/.coredns
+      owner: vagrant
+      group: vagrant
+  
+  - name: Add prometheus config
+    copy:
+      src: prometheus.config
+      dest: /home/vagrant/config/.prometheus
+      owner: vagrant
+      group: vagrant
+  
+  - name: Start coredns
+    docker_container:
+      name: tensorflow-io-coredns
+      image: coredns/coredns
+      network_mode: host
+      volumes:
+      - /home/vagrant/config/.coredns:/Corefile
+
+  - name: Start prometheus
+    docker_container:
+      name: tensorflow-io-prometheus
+      image: prom/prometheus
+      network_mode: host
+      volumes:
+      - /home/vagrant/config/.prometheus:/etc/prometheus/prometheus.yml
